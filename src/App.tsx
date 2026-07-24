@@ -6,6 +6,7 @@ import { Overview } from "./pages/Overview";
 import { CommandesGaz } from "./pages/CommandesGaz";
 import { Ramassage } from "./pages/Ramassage";
 import { Boutiques } from "./pages/Boutiques";
+import { Livreurs } from "./pages/Livreurs";
 import { Ramasseurs } from "./pages/Ramasseurs";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ function AppRoutes() {
         <Route path="commandes-gaz" element={<CommandesGaz />} />
         <Route path="ramassage" element={<Ramassage />} />
         <Route path="boutiques" element={<Boutiques />} />
+        <Route path="livreurs" element={<Livreurs />} />
         <Route path="ramasseurs" element={<Ramasseurs />} />
       </Route>
     </Routes>

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: "/commandes-gaz", label: "Commandes gaz", icon: "▮" },
   { to: "/ramassage", label: "Ramassage", icon: "◆" },
   { to: "/boutiques", label: "Boutiques", icon: "▭" },
+  { to: "/livreurs", label: "Livreurs", icon: "▲" },
   { to: "/ramasseurs", label: "Ramasseurs", icon: "●" },
 ];
 
