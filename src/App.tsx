@@ -1,0 +1,47 @@
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./lib/auth";
+import { Layout } from "./components/Layout";
+import { Login } from "./pages/Login";
+import { Overview } from "./pages/Overview";
+import { CommandesGaz } from "./pages/CommandesGaz";
+import { Ramassage } from "./pages/Ramassage";
+import { Boutiques } from "./pages/Boutiques";
+import { Ramasseurs } from "./pages/Ramasseurs";
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <Layout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Overview />} />
+        <Route path="commandes-gaz" element={<CommandesGaz />} />
+        <Route path="ramassage" element={<Ramassage />} />
+        <Route path="boutiques" element={<Boutiques />} />
+        <Route path="ramasseurs" element={<Ramasseurs />} />
+      </Route>
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
