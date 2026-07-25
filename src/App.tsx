@@ -6,6 +6,7 @@ import { Overview } from "./pages/Overview";
 import { CommandesGaz } from "./pages/CommandesGaz";
 import { Ramassage } from "./pages/Ramassage";
 import { Encaissements } from "./pages/Encaissements";
+import { Credits } from "./pages/Credits";
 import { Support } from "./pages/Support";
 import { Boutiques } from "./pages/Boutiques";
 import { Livreurs } from "./pages/Livreurs";
@@ -33,6 +34,7 @@ function AppRoutes() {
         <Route path="commandes-gaz" element={<CommandesGaz />} />
         <Route path="ramassage" element={<Ramassage />} />
         <Route path="encaissements" element={<Encaissements />} />
+        <Route path="credits" element={<Credits />} />
         <Route path="support" element={<Support />} />
         <Route path="boutiques" element={<Boutiques />} />
         <Route path="livreurs" element={<Livreurs />} />
