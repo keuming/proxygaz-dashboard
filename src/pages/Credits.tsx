@@ -24,6 +24,7 @@ const FILTRES = [
 
 export function Credits() {
   const [demandes, setDemandes] = useState<DemandeCredit[]>([]);
+  const [toutes, setToutes] = useState<DemandeCredit[]>([]);
   const [filtre, setFiltre] = useState("en_attente");
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
@@ -37,9 +38,30 @@ export function Credits() {
       .finally(() => setChargement(false));
   }, [filtre]);
 
+  // Chargé indépendamment du filtre de la liste, pour calculer les totaux globaux
+  const chargerToutes = useCallback(() => {
+    trpcQuery<DemandeCredit[]>("admin.listDemandesCredit", {}).then(setToutes).catch(() => {});
+  }, []);
+
   useEffect(() => {
     charger();
   }, [charger]);
+
+  useEffect(() => {
+    chargerToutes();
+  }, [chargerToutes]);
+
+  const validees = toutes.filter((d) => d.statut === "validee");
+  const enAttente = toutes.filter((d) => d.statut === "en_attente");
+  const totalCreditsVendus = validees.reduce((s, d) => s + d.quantiteCredits, 0);
+  const totalEncaisse = validees.reduce((s, d) => s + Number(d.montantPaye), 0);
+  const totalLivreurs = validees
+    .filter((d) => d.profil === "livreur")
+    .reduce((s, d) => s + Number(d.montantPaye), 0);
+  const totalRamasseurs = validees
+    .filter((d) => d.profil === "ramasseur")
+    .reduce((s, d) => s + Number(d.montantPaye), 0);
+  const montantEnAttente = enAttente.reduce((s, d) => s + Number(d.montantPaye), 0);
 
   async function valider(id: string) {
     setActionEnCours(id);
@@ -47,6 +69,7 @@ export function Credits() {
     try {
       await trpcMutation("admin.validerDemandeCredit", { demandeId: id });
       charger();
+      chargerToutes();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
     } finally {
@@ -60,6 +83,7 @@ export function Credits() {
     try {
       await trpcMutation("admin.rejeterDemandeCredit", { demandeId: id });
       charger();
+      chargerToutes();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
     } finally {
@@ -73,6 +97,37 @@ export function Credits() {
         title="Crédits"
         subtitle="Mise à disposition des crédits achetés par les livreurs et ramasseurs (1 crédit = 100 FCFA)"
       />
+
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Card className="p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-ink/40">
+            Chiffre d'affaires crédits
+          </div>
+          <div className="mt-1 font-data text-2xl font-bold text-ink">
+            {totalEncaisse.toLocaleString()} <span className="text-xs font-normal">FCFA</span>
+          </div>
+          <div className="mt-0.5 text-xs text-ink/40">{totalCreditsVendus} crédit(s) vendus</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-ink/40">Part livreurs</div>
+          <div className="mt-1 font-data text-2xl font-bold text-steel-600">
+            {totalLivreurs.toLocaleString()} <span className="text-xs font-normal">FCFA</span>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-ink/40">Part ramasseurs</div>
+          <div className="mt-1 font-data text-2xl font-bold text-gaz-600">
+            {totalRamasseurs.toLocaleString()} <span className="text-xs font-normal">FCFA</span>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-medium uppercase tracking-wide text-ink/40">En attente</div>
+          <div className="mt-1 font-data text-2xl font-bold text-safety-500">
+            {montantEnAttente.toLocaleString()} <span className="text-xs font-normal">FCFA</span>
+          </div>
+          <div className="mt-0.5 text-xs text-ink/40">{enAttente.length} demande(s) à traiter</div>
+        </Card>
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         {FILTRES.map((f) => (
