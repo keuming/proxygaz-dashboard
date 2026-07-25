@@ -7,8 +7,10 @@ import { Modal, FormField, inputClass } from "../components/Modal";
 interface Boutique {
   id: string;
   nomBoutique: string;
+  pays: string;
   ville: string;
   commune: string | null;
+  quartier: string | null;
   adresse: string | null;
   statutValidation: string;
 }
@@ -16,11 +18,15 @@ interface Boutique {
 const CHAMPS_INITIAUX = {
   nom: "",
   telephone: "",
-  motDePasse: "",
+  codePin: "",
   nomBoutique: "",
+  pays: "Côte d'Ivoire",
   ville: "Abidjan",
   commune: "",
+  quartier: "",
   adresse: "",
+  latitude: "",
+  longitude: "",
 };
 
 export function Boutiques() {
@@ -64,7 +70,10 @@ export function Boutiques() {
       await trpcMutation("admin.creerBoutique", {
         ...champs,
         commune: champs.commune || undefined,
+        quartier: champs.quartier || undefined,
         adresse: champs.adresse || undefined,
+        latitude: champs.latitude ? Number(champs.latitude) : undefined,
+        longitude: champs.longitude ? Number(champs.longitude) : undefined,
       });
       setModalOuvert(false);
       setChamps(CHAMPS_INITIAUX);
@@ -112,6 +121,7 @@ export function Boutiques() {
                 <tr key={b.id} className="border-b border-ink/5 last:border-0">
                   <td className="px-4 py-3 font-medium">{b.nomBoutique}</td>
                   <td className="px-4 py-3 text-ink/70">
+                    {b.quartier ? `${b.quartier}, ` : ""}
                     {b.commune ? `${b.commune}, ` : ""}
                     {b.ville}
                   </td>
@@ -163,14 +173,18 @@ export function Boutiques() {
               required
             />
           </FormField>
-          <FormField label="Mot de passe">
+          <FormField label="Code PIN (4 chiffres) — servira à la connexion">
             <input
               type="password"
-              className={inputClass}
-              value={champs.motDePasse}
-              onChange={(e) => setChamps({ ...champs, motDePasse: e.target.value })}
+              inputMode="numeric"
+              pattern="\d{4}"
+              maxLength={4}
+              className={`${inputClass} text-center tracking-[0.5em]`}
+              value={champs.codePin}
+              onChange={(e) =>
+                setChamps({ ...champs, codePin: e.target.value.replace(/\D/g, "").slice(0, 4) })
+              }
               required
-              minLength={6}
             />
           </FormField>
           <FormField label="Nom de la boutique">
@@ -182,6 +196,14 @@ export function Boutiques() {
             />
           </FormField>
           <div className="grid grid-cols-2 gap-3">
+            <FormField label="Pays">
+              <input
+                className={inputClass}
+                value={champs.pays}
+                onChange={(e) => setChamps({ ...champs, pays: e.target.value })}
+                required
+              />
+            </FormField>
             <FormField label="Ville">
               <input
                 className={inputClass}
@@ -190,11 +212,21 @@ export function Boutiques() {
                 required
               />
             </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <FormField label="Commune">
               <input
                 className={inputClass}
                 value={champs.commune}
                 onChange={(e) => setChamps({ ...champs, commune: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Quartier">
+              <input
+                className={inputClass}
+                placeholder="Angré, Riviera..."
+                value={champs.quartier}
+                onChange={(e) => setChamps({ ...champs, quartier: e.target.value })}
               />
             </FormField>
           </div>
@@ -205,6 +237,31 @@ export function Boutiques() {
               onChange={(e) => setChamps({ ...champs, adresse: e.target.value })}
             />
           </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Latitude">
+              <input
+                type="number"
+                step="any"
+                placeholder="5.336"
+                className={inputClass}
+                value={champs.latitude}
+                onChange={(e) => setChamps({ ...champs, latitude: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Longitude">
+              <input
+                type="number"
+                step="any"
+                placeholder="-4.0267"
+                className={inputClass}
+                value={champs.longitude}
+                onChange={(e) => setChamps({ ...champs, longitude: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <p className="mb-3 text-xs text-ink/40">
+            Astuce : fais un clic droit sur l'emplacement dans Google Maps pour copier ses coordonnées.
+          </p>
 
           <button
             type="submit"
