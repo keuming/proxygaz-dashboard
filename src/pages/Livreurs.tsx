@@ -17,8 +17,13 @@ interface Livreur {
 const CHAMPS_INITIAUX = {
   nom: "",
   telephone: "",
-  motDePasse: "",
+  codePin: "",
+  pays: "Côte d'Ivoire",
   ville: "Abidjan",
+  commune: "",
+  quartier: "",
+  latitude: "",
+  longitude: "",
   vehicule: "",
   zonesCouvertes: "",
 };
@@ -64,8 +69,13 @@ export function Livreurs() {
       await trpcMutation("admin.creerLivreur", {
         nom: champs.nom,
         telephone: champs.telephone,
-        motDePasse: champs.motDePasse,
+        codePin: champs.codePin,
+        pays: champs.pays,
         ville: champs.ville,
+        commune: champs.commune || undefined,
+        quartier: champs.quartier || undefined,
+        latitude: champs.latitude ? Number(champs.latitude) : undefined,
+        longitude: champs.longitude ? Number(champs.longitude) : undefined,
         vehicule: champs.vehicule || undefined,
         zonesCouvertes: champs.zonesCouvertes.split(",").map((z) => z.trim()).filter(Boolean),
       });
@@ -172,24 +182,77 @@ export function Livreurs() {
               required
             />
           </FormField>
-          <FormField label="Mot de passe">
+          <FormField label="Code PIN (4 chiffres) — servira à la connexion">
             <input
               type="password"
-              className={inputClass}
-              value={champs.motDePasse}
-              onChange={(e) => setChamps({ ...champs, motDePasse: e.target.value })}
-              required
-              minLength={6}
-            />
-          </FormField>
-          <FormField label="Ville">
-            <input
-              className={inputClass}
-              value={champs.ville}
-              onChange={(e) => setChamps({ ...champs, ville: e.target.value })}
+              inputMode="numeric"
+              pattern="\d{4}"
+              maxLength={4}
+              className={`${inputClass} text-center tracking-[0.5em]`}
+              value={champs.codePin}
+              onChange={(e) =>
+                setChamps({ ...champs, codePin: e.target.value.replace(/\D/g, "").slice(0, 4) })
+              }
               required
             />
           </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Pays">
+              <input
+                className={inputClass}
+                value={champs.pays}
+                onChange={(e) => setChamps({ ...champs, pays: e.target.value })}
+                required
+              />
+            </FormField>
+            <FormField label="Ville">
+              <input
+                className={inputClass}
+                value={champs.ville}
+                onChange={(e) => setChamps({ ...champs, ville: e.target.value })}
+                required
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Commune">
+              <input
+                className={inputClass}
+                value={champs.commune}
+                onChange={(e) => setChamps({ ...champs, commune: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Quartier">
+              <input
+                className={inputClass}
+                placeholder="Angré, Riviera..."
+                value={champs.quartier}
+                onChange={(e) => setChamps({ ...champs, quartier: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Latitude">
+              <input
+                type="number"
+                step="any"
+                placeholder="5.336"
+                className={inputClass}
+                value={champs.latitude}
+                onChange={(e) => setChamps({ ...champs, latitude: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Longitude">
+              <input
+                type="number"
+                step="any"
+                placeholder="-4.0267"
+                className={inputClass}
+                value={champs.longitude}
+                onChange={(e) => setChamps({ ...champs, longitude: e.target.value })}
+              />
+            </FormField>
+          </div>
           <FormField label="Véhicule">
             <input
               className={inputClass}
