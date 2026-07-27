@@ -3,6 +3,7 @@ import { trpcQuery, trpcMutation } from "../lib/api";
 import { Card, PageHeader } from "../components/Card";
 import { StatusGauge } from "../components/StatusGauge";
 import { Modal, FormField, inputClass } from "../components/Modal";
+import { AddressPicker } from "../components/AddressPicker";
 
 interface Boutique {
   id: string;
@@ -230,39 +231,19 @@ export function Boutiques() {
               />
             </FormField>
           </div>
-          <FormField label="Adresse">
-            <input
-              className={inputClass}
-              value={champs.adresse}
-              onChange={(e) => setChamps({ ...champs, adresse: e.target.value })}
+          <FormField label="Adresse précise (avec carte)">
+            <AddressPicker
+              valeur={champs.adresse}
+              onChange={(a) =>
+                setChamps({
+                  ...champs,
+                  adresse: a.adresse,
+                  latitude: a.latitude ? String(a.latitude) : "",
+                  longitude: a.longitude ? String(a.longitude) : "",
+                })
+              }
             />
           </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Latitude">
-              <input
-                type="number"
-                step="any"
-                placeholder="5.336"
-                className={inputClass}
-                value={champs.latitude}
-                onChange={(e) => setChamps({ ...champs, latitude: e.target.value })}
-              />
-            </FormField>
-            <FormField label="Longitude">
-              <input
-                type="number"
-                step="any"
-                placeholder="-4.0267"
-                className={inputClass}
-                value={champs.longitude}
-                onChange={(e) => setChamps({ ...champs, longitude: e.target.value })}
-              />
-            </FormField>
-          </div>
-          <p className="mb-3 text-xs text-ink/40">
-            Astuce : fais un clic droit sur l'emplacement dans Google Maps pour copier ses coordonnées.
-          </p>
-
           <button
             type="submit"
             disabled={creationEnCours}

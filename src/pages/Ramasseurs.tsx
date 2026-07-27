@@ -3,6 +3,7 @@ import { trpcQuery, trpcMutation } from "../lib/api";
 import { Card, PageHeader } from "../components/Card";
 import { StatusGauge } from "../components/StatusGauge";
 import { Modal, FormField, inputClass } from "../components/Modal";
+import { AddressPicker } from "../components/AddressPicker";
 
 interface Ramasseur {
   id: string;
@@ -38,6 +39,7 @@ export function Ramasseurs() {
   const [actionEnCours, setActionEnCours] = useState<string | null>(null);
   const [modalOuvert, setModalOuvert] = useState(false);
   const [champs, setChamps] = useState(CHAMPS_INITIAUX);
+  const [adresseAffichage, setAdresseAffichage] = useState("");
   const [creationEnCours, setCreationEnCours] = useState(false);
 
   const charger = useCallback(() => {
@@ -86,6 +88,7 @@ export function Ramasseurs() {
       });
       setModalOuvert(false);
       setChamps(CHAMPS_INITIAUX);
+      setAdresseAffichage("");
       charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur lors de la création");
@@ -238,28 +241,19 @@ export function Ramasseurs() {
               />
             </FormField>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Latitude">
-              <input
-                type="number"
-                step="any"
-                placeholder="5.336"
-                className={inputClass}
-                value={champs.latitude}
-                onChange={(e) => setChamps({ ...champs, latitude: e.target.value })}
-              />
-            </FormField>
-            <FormField label="Longitude">
-              <input
-                type="number"
-                step="any"
-                placeholder="-4.0267"
-                className={inputClass}
-                value={champs.longitude}
-                onChange={(e) => setChamps({ ...champs, longitude: e.target.value })}
-              />
-            </FormField>
-          </div>
+          <FormField label="Position (avec carte)">
+            <AddressPicker
+              valeur={adresseAffichage}
+              onChange={(a) => {
+                setAdresseAffichage(a.adresse);
+                setChamps({
+                  ...champs,
+                  latitude: a.latitude ? String(a.latitude) : "",
+                  longitude: a.longitude ? String(a.longitude) : "",
+                });
+              }}
+            />
+          </FormField>
           <FormField label="Type">
             <select
               className={inputClass}
