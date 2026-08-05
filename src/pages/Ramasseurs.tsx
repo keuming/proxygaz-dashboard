@@ -23,6 +23,30 @@ interface Ramasseur {
   statutValidation: string;
   nombreRamassages: number;
   createdAt: string;
+  societeLivraisonId: string | null;
+  nomSocieteLivraison: string | null;
+}
+
+// Regroupe une liste rattachable à une société de livraison (nomSocieteLivraison nul =
+// indépendant) par société, triées par ordre alphabétique, indépendants toujours en dernier.
+// Distinct du champ "nomSociete" du ramasseur, qui n'est qu'un libellé libre informatif.
+function grouperParSociete<T extends { nomSocieteLivraison: string | null }>(items: T[]) {
+  const groupes = new Map<string, T[]>();
+  for (const item of items) {
+    const cle = item.nomSocieteLivraison ?? "__independants__";
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle)!.push(item);
+  }
+  const entrees = Array.from(groupes.entries());
+  entrees.sort((a, b) => {
+    if (a[0] === "__independants__") return 1;
+    if (b[0] === "__independants__") return -1;
+    return a[0].localeCompare(b[0]);
+  });
+  return entrees.map(([cle, items]) => ({
+    label: cle === "__independants__" ? "Indépendants" : cle,
+    items,
+  }));
 }
 
 const CHAMPS_INITIAUX = {
@@ -39,6 +63,7 @@ const CHAMPS_INITIAUX = {
   nomSociete: "",
   zonesCouvertes: "",
   vehicule: "",
+  societeLivraisonId: "",
 };
 
 const CHAMPS_EDITION_INITIAUX = {
@@ -52,6 +77,7 @@ const CHAMPS_EDITION_INITIAUX = {
   quartier: "",
   latitude: "",
   longitude: "",
+  societeLivraisonId: "",
 };
 
 const STATUTS: { value: string; label: string }[] = [
@@ -72,6 +98,7 @@ function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
 
 export function Ramasseurs() {
   const [ramasseurs, setRamasseurs] = useState<Ramasseur[]>([]);
+  const [societes, setSocietes] = useState<{ id: string; nomSociete: string }[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [actionEnCours, setActionEnCours] = useState<string | null>(null);
@@ -96,6 +123,9 @@ export function Ramasseurs() {
 
   useEffect(() => {
     charger();
+    trpcQuery<{ id: string; nomSociete: string; statutValidation: string }[]>("admin.listSocietesLivraison")
+      .then((rows) => setSocietes(rows.filter((s) => s.statutValidation === "valide")))
+      .catch(() => {});
   }, [charger]);
 
   async function changerStatut(id: string, statut: string) {
@@ -129,6 +159,7 @@ export function Ramasseurs() {
         nomSociete: champs.nomSociete || undefined,
         zonesCouvertes: champs.zonesCouvertes.split(",").map((z) => z.trim()).filter(Boolean),
         vehicule: champs.vehicule || undefined,
+        societeLivraisonId: champs.societeLivraisonId || undefined,
       });
       setModalOuvert(false);
       setChamps(CHAMPS_INITIAUX);
@@ -153,6 +184,7 @@ export function Ramasseurs() {
       quartier: r.quartier ?? "",
       latitude: r.latitude != null ? String(r.latitude) : "",
       longitude: r.longitude != null ? String(r.longitude) : "",
+      societeLivraisonId: r.societeLivraisonId ?? "",
     });
     setAdresseEdition(r.quartier ?? r.ville ?? "");
     setEditionOuverte(r);
@@ -179,6 +211,8 @@ export function Ramasseurs() {
         quartier: champsEdition.quartier || undefined,
         latitude: champsEdition.latitude ? Number(champsEdition.latitude) : undefined,
         longitude: champsEdition.longitude ? Number(champsEdition.longitude) : undefined,
+        // "" = détacher explicitement (→ null), une société sélectionnée = rattacher
+        societeLivraisonId: champsEdition.societeLivraisonId || null,
       });
       setEditionOuverte(null);
       charger();
@@ -223,54 +257,61 @@ export function Ramasseurs() {
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody>
-                {ramasseurs.map((r) => (
-                  <tr key={r.id} className="border-b border-ink/5 last:border-0">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{r.nomSociete || r.nom}</div>
-                      <div className="font-data text-xs text-ink/50">{r.telephone}</div>
-                    </td>
-                    <td className="px-4 py-3 text-ink/70">
-                      {r.type === "societe" ? "Société" : "Particulier"}
-                    </td>
-                    <td className="max-w-xs truncate px-4 py-3 text-ink/70">
-                      {r.zonesCouvertes.join(", ")}
-                    </td>
-                    <td className="px-4 py-3 font-data">{r.nombreRamassages}</td>
-                    <td className="px-4 py-3">
-                      <StatusGauge statut={r.statutValidation} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setDetailsOuverts(r)}
-                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
-                        >
-                          Détails
-                        </button>
-                        <button
-                          onClick={() => ouvrirEdition(r)}
-                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
-                        >
-                          Modifier
-                        </button>
-                        <select
-                          value={r.statutValidation}
-                          disabled={actionEnCours === r.id}
-                          onChange={(e) => changerStatut(r.id, e.target.value)}
-                          className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
-                        >
-                          {STATUTS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+              {grouperParSociete(ramasseurs).map((groupe) => (
+                <tbody key={groupe.label}>
+                  <tr className="bg-ink/[0.03]">
+                    <td colSpan={6} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
+                      {groupe.label} · {groupe.items.length} ramasseur{groupe.items.length !== 1 ? "s" : ""}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  {groupe.items.map((r) => (
+                    <tr key={r.id} className="border-b border-ink/5 last:border-0">
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{r.nomSociete || r.nom}</div>
+                        <div className="font-data text-xs text-ink/50">{r.telephone}</div>
+                      </td>
+                      <td className="px-4 py-3 text-ink/70">
+                        {r.type === "societe" ? "Société" : "Particulier"}
+                      </td>
+                      <td className="max-w-xs truncate px-4 py-3 text-ink/70">
+                        {r.zonesCouvertes.join(", ")}
+                      </td>
+                      <td className="px-4 py-3 font-data">{r.nombreRamassages}</td>
+                      <td className="px-4 py-3">
+                        <StatusGauge statut={r.statutValidation} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setDetailsOuverts(r)}
+                            className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                          >
+                            Détails
+                          </button>
+                          <button
+                            onClick={() => ouvrirEdition(r)}
+                            className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                          >
+                            Modifier
+                          </button>
+                          <select
+                            value={r.statutValidation}
+                            disabled={actionEnCours === r.id}
+                            onChange={(e) => changerStatut(r.id, e.target.value)}
+                            className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
+                          >
+                            {STATUTS.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
             </table>
           </div>
         )}
@@ -393,6 +434,20 @@ export function Ramasseurs() {
               onChange={(e) => setChamps({ ...champs, vehicule: e.target.value })}
             />
           </FormField>
+          <FormField label="Société de livraison (optionnel)">
+            <select
+              className={inputClass}
+              value={champs.societeLivraisonId}
+              onChange={(e) => setChamps({ ...champs, societeLivraisonId: e.target.value })}
+            >
+              <option value="">— Aucune (ramasseur indépendant) —</option>
+              {societes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nomSociete}
+                </option>
+              ))}
+            </select>
+          </FormField>
 
           <button
             type="submit"
@@ -419,8 +474,12 @@ export function Ramasseurs() {
               valeur={detailsOuverts.type === "societe" ? "Société" : "Particulier"}
             />
             {detailsOuverts.nomSociete && (
-              <LigneDetail label="Nom de la société" valeur={detailsOuverts.nomSociete} />
+              <LigneDetail label="Nom de la société (libellé libre)" valeur={detailsOuverts.nomSociete} />
             )}
+            <LigneDetail
+              label="Société de livraison (pot commun)"
+              valeur={detailsOuverts.nomSocieteLivraison ?? "Indépendant"}
+            />
             <LigneDetail label="Véhicule" valeur={detailsOuverts.vehicule ?? ""} />
             <LigneDetail label="Zones couvertes" valeur={detailsOuverts.zonesCouvertes.join(", ")} />
             <LigneDetail label="Pays" valeur={detailsOuverts.pays} />
@@ -534,6 +593,20 @@ export function Ramasseurs() {
                 });
               }}
             />
+          </FormField>
+          <FormField label="Société de livraison (optionnel)">
+            <select
+              className={inputClass}
+              value={champsEdition.societeLivraisonId}
+              onChange={(e) => setChampsEdition({ ...champsEdition, societeLivraisonId: e.target.value })}
+            >
+              <option value="">— Aucune (ramasseur indépendant) —</option>
+              {societes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nomSociete}
+                </option>
+              ))}
+            </select>
           </FormField>
           <button
             type="submit"

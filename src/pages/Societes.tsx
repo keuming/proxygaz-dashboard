@@ -20,6 +20,7 @@ interface Societe {
   gerantTelephone: string;
   nombreLivreurs: number;
   nombreBoutiques: number;
+  nombreRamasseurs: number;
   createdAt: string;
 }
 
@@ -199,6 +200,7 @@ export function Societes() {
                   <th className="px-4 py-3">Localisation</th>
                   <th className="px-4 py-3">Livreurs</th>
                   <th className="px-4 py-3">Boutiques</th>
+                  <th className="px-4 py-3">Ramasseurs</th>
                   <th className="px-4 py-3">Pot commun</th>
                   <th className="px-4 py-3">Statut</th>
                   <th className="px-4 py-3"></th>
@@ -220,6 +222,7 @@ export function Societes() {
                     </td>
                     <td className="px-4 py-3 font-data">{s.nombreLivreurs}</td>
                     <td className="px-4 py-3 font-data">{s.nombreBoutiques}</td>
+                    <td className="px-4 py-3 font-data">{s.nombreRamasseurs}</td>
                     <td className="px-4 py-3 font-data">
                       {s.credits} crédit{s.credits !== 1 ? "s" : ""}
                     </td>
@@ -379,6 +382,7 @@ export function Societes() {
             <LigneDetail label="Quartier" valeur={detailsOuverts.quartier ?? ""} />
             <LigneDetail label="Livreurs rattachés" valeur={String(detailsOuverts.nombreLivreurs)} />
             <LigneDetail label="Boutiques rattachées" valeur={String(detailsOuverts.nombreBoutiques)} />
+            <LigneDetail label="Ramasseurs rattachés" valeur={String(detailsOuverts.nombreRamasseurs)} />
             <LigneDetail label="Pot de crédit commun" valeur={`${detailsOuverts.credits} crédit(s)`} />
             <LigneDetail
               label="Inscrite le"
