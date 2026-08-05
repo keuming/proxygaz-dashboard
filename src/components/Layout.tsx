@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { InstallPrompt } from "./InstallPrompt";
 
 const NAV_ITEMS = [
   { to: "/", label: "Vue d'ensemble", icon: "◎" },
@@ -128,6 +129,8 @@ export function Layout() {
           </div>
         </main>
       </div>
+
+      <InstallPrompt />
     </div>
   );
 }
