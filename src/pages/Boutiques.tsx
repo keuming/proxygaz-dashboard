@@ -13,7 +13,22 @@ interface Boutique {
   commune: string | null;
   quartier: string | null;
   adresse: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  rayonLivraisonKm: number | null;
   statutValidation: string;
+  gerantNom: string;
+  gerantTelephone: string;
+  createdAt: string;
+}
+
+function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
+  return (
+    <div className="flex justify-between border-b border-ink/5 py-2 text-sm last:border-0">
+      <span className="text-ink/50">{label}</span>
+      <span className="text-right font-medium text-ink">{valeur || "—"}</span>
+    </div>
+  );
 }
 
 const CHAMPS_INITIAUX = {
@@ -30,6 +45,25 @@ const CHAMPS_INITIAUX = {
   longitude: "",
 };
 
+const CHAMPS_EDITION_INITIAUX = {
+  nomBoutique: "",
+  pays: "",
+  ville: "",
+  commune: "",
+  quartier: "",
+  adresse: "",
+  latitude: "",
+  longitude: "",
+  rayonLivraisonKm: "",
+};
+
+const STATUTS: { value: string; label: string }[] = [
+  { value: "en_attente", label: "En attente" },
+  { value: "valide", label: "Validée" },
+  { value: "rejete", label: "Rejetée" },
+  { value: "suspendu", label: "Suspendue (désactivée)" },
+];
+
 export function Boutiques() {
   const [boutiques, setBoutiques] = useState<Boutique[]>([]);
   const [chargement, setChargement] = useState(true);
@@ -38,6 +72,11 @@ export function Boutiques() {
   const [modalOuvert, setModalOuvert] = useState(false);
   const [champs, setChamps] = useState(CHAMPS_INITIAUX);
   const [creationEnCours, setCreationEnCours] = useState(false);
+
+  const [editionOuverte, setEditionOuverte] = useState<Boutique | null>(null);
+  const [detailsOuverts, setDetailsOuverts] = useState<Boutique | null>(null);
+  const [champsEdition, setChampsEdition] = useState(CHAMPS_EDITION_INITIAUX);
+  const [editionEnCours, setEditionEnCours] = useState(false);
 
   const charger = useCallback(() => {
     setChargement(true);
@@ -51,10 +90,10 @@ export function Boutiques() {
     charger();
   }, [charger]);
 
-  async function valider(id: string, approuver: boolean) {
+  async function changerStatut(id: string, statut: string) {
     setActionEnCours(id);
     try {
-      await trpcMutation("admin.validerBoutique", { boutiqueId: id, approuver });
+      await trpcMutation("admin.changerStatutBoutique", { boutiqueId: id, statut });
       charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
@@ -86,6 +125,50 @@ export function Boutiques() {
     }
   }
 
+  function ouvrirEdition(b: Boutique) {
+    setChampsEdition({
+      nomBoutique: b.nomBoutique,
+      pays: b.pays,
+      ville: b.ville,
+      commune: b.commune ?? "",
+      quartier: b.quartier ?? "",
+      adresse: b.adresse ?? "",
+      latitude: b.latitude != null ? String(b.latitude) : "",
+      longitude: b.longitude != null ? String(b.longitude) : "",
+      rayonLivraisonKm: b.rayonLivraisonKm != null ? String(b.rayonLivraisonKm) : "",
+    });
+    setEditionOuverte(b);
+  }
+
+  async function enregistrerEdition(e: FormEvent) {
+    e.preventDefault();
+    if (!editionOuverte) return;
+    setEditionEnCours(true);
+    setErreur(null);
+    try {
+      await trpcMutation("admin.modifierBoutique", {
+        boutiqueId: editionOuverte.id,
+        nomBoutique: champsEdition.nomBoutique,
+        pays: champsEdition.pays,
+        ville: champsEdition.ville,
+        commune: champsEdition.commune || undefined,
+        quartier: champsEdition.quartier || undefined,
+        adresse: champsEdition.adresse || undefined,
+        latitude: champsEdition.latitude ? Number(champsEdition.latitude) : undefined,
+        longitude: champsEdition.longitude ? Number(champsEdition.longitude) : undefined,
+        rayonLivraisonKm: champsEdition.rayonLivraisonKm
+          ? Number(champsEdition.rayonLivraisonKm)
+          : undefined,
+      });
+      setEditionOuverte(null);
+      charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Erreur lors de la modification");
+    } finally {
+      setEditionEnCours(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -108,6 +191,7 @@ export function Boutiques() {
         ) : boutiques.length === 0 ? (
           <div className="p-6 text-sm text-ink/50">Aucune boutique enregistrée.</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
@@ -120,7 +204,12 @@ export function Boutiques() {
             <tbody>
               {boutiques.map((b) => (
                 <tr key={b.id} className="border-b border-ink/5 last:border-0">
-                  <td className="px-4 py-3 font-medium">{b.nomBoutique}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{b.nomBoutique}</div>
+                    <div className="font-data text-xs text-ink/50">
+                      {b.gerantNom} · {b.gerantTelephone}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-ink/70">
                     {b.quartier ? `${b.quartier}, ` : ""}
                     {b.commune ? `${b.commune}, ` : ""}
@@ -130,29 +219,38 @@ export function Boutiques() {
                     <StatusGauge statut={b.statutValidation} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {b.statutValidation === "en_attente" && (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => valider(b.id, true)}
-                          disabled={actionEnCours === b.id}
-                          className="rounded-md bg-gaz-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-gaz-600 disabled:opacity-60"
-                        >
-                          Valider
-                        </button>
-                        <button
-                          onClick={() => valider(b.id, false)}
-                          disabled={actionEnCours === b.id}
-                          className="rounded-md bg-valve-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-valve-600 disabled:opacity-60"
-                        >
-                          Rejeter
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setDetailsOuverts(b)}
+                        className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                      >
+                        Détails
+                      </button>
+                      <button
+                        onClick={() => ouvrirEdition(b)}
+                        className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                      >
+                        Modifier
+                      </button>
+                      <select
+                        value={b.statutValidation}
+                        disabled={actionEnCours === b.id}
+                        onChange={(e) => changerStatut(b.id, e.target.value)}
+                        className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
+                      >
+                        {STATUTS.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
 
@@ -250,6 +348,123 @@ export function Boutiques() {
             className="mt-2 w-full rounded-md bg-steel-500 py-2.5 text-sm font-medium text-white hover:bg-steel-600 disabled:opacity-60"
           >
             {creationEnCours ? "Création..." : "Créer la boutique (validée d'office)"}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Détails (lecture seule) */}
+      <Modal
+        open={detailsOuverts !== null}
+        onClose={() => setDetailsOuverts(null)}
+        title={detailsOuverts?.nomBoutique ?? "Détails"}
+      >
+        {detailsOuverts && (
+          <div>
+            <LigneDetail label="Gérant" valeur={detailsOuverts.gerantNom} />
+            <LigneDetail label="Téléphone" valeur={detailsOuverts.gerantTelephone} />
+            <LigneDetail label="Pays" valeur={detailsOuverts.pays} />
+            <LigneDetail label="Ville" valeur={detailsOuverts.ville} />
+            <LigneDetail label="Commune" valeur={detailsOuverts.commune ?? ""} />
+            <LigneDetail label="Quartier" valeur={detailsOuverts.quartier ?? ""} />
+            <LigneDetail label="Adresse" valeur={detailsOuverts.adresse ?? ""} />
+            <LigneDetail
+              label="Position GPS"
+              valeur={
+                detailsOuverts.latitude != null
+                  ? `${detailsOuverts.latitude}, ${detailsOuverts.longitude}`
+                  : ""
+              }
+            />
+            <LigneDetail
+              label="Rayon de livraison"
+              valeur={detailsOuverts.rayonLivraisonKm != null ? `${detailsOuverts.rayonLivraisonKm} km` : ""}
+            />
+            <LigneDetail
+              label="Inscrite le"
+              valeur={new Date(detailsOuverts.createdAt).toLocaleDateString("fr-FR")}
+            />
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={editionOuverte !== null}
+        onClose={() => setEditionOuverte(null)}
+        title={`Modifier — ${editionOuverte?.nomBoutique ?? ""}`}
+      >
+        <form onSubmit={enregistrerEdition}>
+          <FormField label="Nom de la boutique">
+            <input
+              className={inputClass}
+              value={champsEdition.nomBoutique}
+              onChange={(e) => setChampsEdition({ ...champsEdition, nomBoutique: e.target.value })}
+              required
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Pays">
+              <input
+                className={inputClass}
+                value={champsEdition.pays}
+                onChange={(e) => setChampsEdition({ ...champsEdition, pays: e.target.value })}
+                required
+              />
+            </FormField>
+            <FormField label="Ville">
+              <input
+                className={inputClass}
+                value={champsEdition.ville}
+                onChange={(e) => setChampsEdition({ ...champsEdition, ville: e.target.value })}
+                required
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Commune">
+              <input
+                className={inputClass}
+                value={champsEdition.commune}
+                onChange={(e) => setChampsEdition({ ...champsEdition, commune: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Quartier">
+              <input
+                className={inputClass}
+                value={champsEdition.quartier}
+                onChange={(e) => setChampsEdition({ ...champsEdition, quartier: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Adresse précise (avec carte)">
+            <AddressPicker
+              valeur={champsEdition.adresse}
+              onChange={(a) =>
+                setChampsEdition({
+                  ...champsEdition,
+                  adresse: a.adresse,
+                  latitude: a.latitude ? String(a.latitude) : "",
+                  longitude: a.longitude ? String(a.longitude) : "",
+                })
+              }
+            />
+          </FormField>
+          <FormField label="Rayon de livraison (km)">
+            <input
+              type="number"
+              step="any"
+              className={inputClass}
+              value={champsEdition.rayonLivraisonKm}
+              onChange={(e) =>
+                setChampsEdition({ ...champsEdition, rayonLivraisonKm: e.target.value })
+              }
+            />
+          </FormField>
+          <button
+            type="submit"
+            disabled={editionEnCours}
+            className="mt-2 w-full rounded-md bg-steel-500 py-2.5 text-sm font-medium text-white hover:bg-steel-600 disabled:opacity-60"
+          >
+            {editionEnCours ? "Enregistrement..." : "Enregistrer les modifications"}
           </button>
         </form>
       </Modal>

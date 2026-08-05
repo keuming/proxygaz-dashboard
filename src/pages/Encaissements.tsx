@@ -167,7 +167,8 @@ export function Encaissements() {
             {transactionsFiltrees.length === 0 ? (
               <div className="p-6 text-sm text-ink/50">Aucun encaissement pour ce filtre.</div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+          <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
                     <th className="px-4 py-3">Service</th>
@@ -220,6 +221,7 @@ export function Encaissements() {
                   ))}
                 </tbody>
               </table>
+          </div>
             )}
           </Card>
         </>

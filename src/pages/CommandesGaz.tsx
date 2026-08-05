@@ -82,6 +82,7 @@ export function CommandesGaz() {
         ) : commandes.length === 0 ? (
           <div className="p-6 text-sm text-ink/50">Aucune commande pour ce filtre.</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
@@ -121,6 +122,7 @@ export function CommandesGaz() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
     </div>

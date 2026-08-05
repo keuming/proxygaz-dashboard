@@ -11,8 +11,16 @@ interface Livreur {
   telephone: string;
   vehicule: string | null;
   zonesCouvertes: string[];
+  pays: string;
+  ville: string | null;
+  commune: string | null;
+  quartier: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  credits: number;
   statutValidation: string;
   nombreLivraisons: number;
+  createdAt: string;
 }
 
 const CHAMPS_INITIAUX = {
@@ -29,6 +37,33 @@ const CHAMPS_INITIAUX = {
   zonesCouvertes: "",
 };
 
+const CHAMPS_EDITION_INITIAUX = {
+  vehicule: "",
+  zonesCouvertes: "",
+  pays: "",
+  ville: "",
+  commune: "",
+  quartier: "",
+  latitude: "",
+  longitude: "",
+};
+
+const STATUTS: { value: string; label: string }[] = [
+  { value: "en_attente", label: "En attente" },
+  { value: "valide", label: "Validé" },
+  { value: "rejete", label: "Rejeté" },
+  { value: "suspendu", label: "Suspendu (désactivé)" },
+];
+
+function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
+  return (
+    <div className="flex justify-between border-b border-ink/5 py-2 text-sm last:border-0">
+      <span className="text-ink/50">{label}</span>
+      <span className="text-right font-medium text-ink">{valeur || "—"}</span>
+    </div>
+  );
+}
+
 export function Livreurs() {
   const [livreurs, setLivreurs] = useState<Livreur[]>([]);
   const [chargement, setChargement] = useState(true);
@@ -38,6 +73,12 @@ export function Livreurs() {
   const [champs, setChamps] = useState(CHAMPS_INITIAUX);
   const [adresseAffichage, setAdresseAffichage] = useState("");
   const [creationEnCours, setCreationEnCours] = useState(false);
+
+  const [detailsOuverts, setDetailsOuverts] = useState<Livreur | null>(null);
+  const [editionOuverte, setEditionOuverte] = useState<Livreur | null>(null);
+  const [champsEdition, setChampsEdition] = useState(CHAMPS_EDITION_INITIAUX);
+  const [adresseEdition, setAdresseEdition] = useState("");
+  const [editionEnCours, setEditionEnCours] = useState(false);
 
   const charger = useCallback(() => {
     setChargement(true);
@@ -51,10 +92,10 @@ export function Livreurs() {
     charger();
   }, [charger]);
 
-  async function valider(id: string, approuver: boolean) {
+  async function changerStatut(id: string, statut: string) {
     setActionEnCours(id);
     try {
-      await trpcMutation("admin.validerLivreur", { livreurId: id, approuver });
+      await trpcMutation("admin.changerStatutLivreur", { livreurId: id, statut });
       charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
@@ -92,6 +133,50 @@ export function Livreurs() {
     }
   }
 
+  function ouvrirEdition(l: Livreur) {
+    setChampsEdition({
+      vehicule: l.vehicule ?? "",
+      zonesCouvertes: l.zonesCouvertes.join(", "),
+      pays: l.pays,
+      ville: l.ville ?? "",
+      commune: l.commune ?? "",
+      quartier: l.quartier ?? "",
+      latitude: l.latitude != null ? String(l.latitude) : "",
+      longitude: l.longitude != null ? String(l.longitude) : "",
+    });
+    setAdresseEdition(l.quartier ?? l.ville ?? "");
+    setEditionOuverte(l);
+  }
+
+  async function enregistrerEdition(e: FormEvent) {
+    e.preventDefault();
+    if (!editionOuverte) return;
+    setEditionEnCours(true);
+    setErreur(null);
+    try {
+      await trpcMutation("admin.modifierLivreur", {
+        livreurId: editionOuverte.id,
+        vehicule: champsEdition.vehicule || undefined,
+        zonesCouvertes: champsEdition.zonesCouvertes
+          .split(",")
+          .map((z) => z.trim())
+          .filter(Boolean),
+        pays: champsEdition.pays,
+        ville: champsEdition.ville,
+        commune: champsEdition.commune || undefined,
+        quartier: champsEdition.quartier || undefined,
+        latitude: champsEdition.latitude ? Number(champsEdition.latitude) : undefined,
+        longitude: champsEdition.longitude ? Number(champsEdition.longitude) : undefined,
+      });
+      setEditionOuverte(null);
+      charger();
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "Erreur lors de la modification");
+    } finally {
+      setEditionEnCours(false);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -114,59 +199,70 @@ export function Livreurs() {
         ) : livreurs.length === 0 ? (
           <div className="p-6 text-sm text-ink/50">Aucun livreur enregistré.</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
-                <th className="px-4 py-3">Nom</th>
-                <th className="px-4 py-3">Véhicule</th>
-                <th className="px-4 py-3">Zones</th>
-                <th className="px-4 py-3">Livraisons</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {livreurs.map((l) => (
-                <tr key={l.id} className="border-b border-ink/5 last:border-0">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{l.nom}</div>
-                    <div className="font-data text-xs text-ink/50">{l.telephone}</div>
-                  </td>
-                  <td className="px-4 py-3 text-ink/70">{l.vehicule ?? "—"}</td>
-                  <td className="max-w-xs truncate px-4 py-3 text-ink/70">
-                    {l.zonesCouvertes.join(", ")}
-                  </td>
-                  <td className="px-4 py-3 font-data">{l.nombreLivraisons}</td>
-                  <td className="px-4 py-3">
-                    <StatusGauge statut={l.statutValidation} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {l.statutValidation === "en_attente" && (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => valider(l.id, true)}
-                          disabled={actionEnCours === l.id}
-                          className="rounded-md bg-gaz-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-gaz-600 disabled:opacity-60"
-                        >
-                          Valider
-                        </button>
-                        <button
-                          onClick={() => valider(l.id, false)}
-                          disabled={actionEnCours === l.id}
-                          className="rounded-md bg-valve-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-valve-600 disabled:opacity-60"
-                        >
-                          Rejeter
-                        </button>
-                      </div>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-4 py-3">Nom</th>
+                  <th className="px-4 py-3">Véhicule</th>
+                  <th className="px-4 py-3">Zones</th>
+                  <th className="px-4 py-3">Livraisons</th>
+                  <th className="px-4 py-3">Statut</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {livreurs.map((l) => (
+                  <tr key={l.id} className="border-b border-ink/5 last:border-0">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{l.nom}</div>
+                      <div className="font-data text-xs text-ink/50">{l.telephone}</div>
+                    </td>
+                    <td className="px-4 py-3 text-ink/70">{l.vehicule ?? "—"}</td>
+                    <td className="max-w-xs truncate px-4 py-3 text-ink/70">
+                      {l.zonesCouvertes.join(", ")}
+                    </td>
+                    <td className="px-4 py-3 font-data">{l.nombreLivraisons}</td>
+                    <td className="px-4 py-3">
+                      <StatusGauge statut={l.statutValidation} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setDetailsOuverts(l)}
+                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                        >
+                          Détails
+                        </button>
+                        <button
+                          onClick={() => ouvrirEdition(l)}
+                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                        >
+                          Modifier
+                        </button>
+                        <select
+                          value={l.statutValidation}
+                          disabled={actionEnCours === l.id}
+                          onChange={(e) => changerStatut(l.id, e.target.value)}
+                          className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
+                        >
+                          {STATUTS.map((s) => (
+                            <option key={s.value} value={s.value}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
+      {/* Création */}
       <Modal open={modalOuvert} onClose={() => setModalOuvert(false)} title="Nouveau livreur">
         <form onSubmit={creerLivreur}>
           <FormField label="Nom">
@@ -271,6 +367,119 @@ export function Livreurs() {
             className="mt-2 w-full rounded-md bg-steel-500 py-2.5 text-sm font-medium text-white hover:bg-steel-600 disabled:opacity-60"
           >
             {creationEnCours ? "Création..." : "Créer le livreur (validé d'office)"}
+          </button>
+        </form>
+      </Modal>
+
+      {/* Détails (lecture seule) */}
+      <Modal
+        open={detailsOuverts !== null}
+        onClose={() => setDetailsOuverts(null)}
+        title={detailsOuverts?.nom || "Détails"}
+      >
+        {detailsOuverts && (
+          <div>
+            <LigneDetail label="Nom" valeur={detailsOuverts.nom} />
+            <LigneDetail label="Téléphone" valeur={detailsOuverts.telephone} />
+            <LigneDetail label="Véhicule" valeur={detailsOuverts.vehicule ?? ""} />
+            <LigneDetail label="Zones couvertes" valeur={detailsOuverts.zonesCouvertes.join(", ")} />
+            <LigneDetail label="Pays" valeur={detailsOuverts.pays} />
+            <LigneDetail label="Ville" valeur={detailsOuverts.ville ?? ""} />
+            <LigneDetail label="Commune" valeur={detailsOuverts.commune ?? ""} />
+            <LigneDetail label="Quartier" valeur={detailsOuverts.quartier ?? ""} />
+            <LigneDetail
+              label="Position GPS"
+              valeur={
+                detailsOuverts.latitude != null
+                  ? `${detailsOuverts.latitude}, ${detailsOuverts.longitude}`
+                  : ""
+              }
+            />
+            <LigneDetail label="Livraisons effectuées" valeur={String(detailsOuverts.nombreLivraisons)} />
+            <LigneDetail label="Solde de crédits" valeur={`${detailsOuverts.credits} crédit(s)`} />
+            <LigneDetail
+              label="Inscrit le"
+              valeur={new Date(detailsOuverts.createdAt).toLocaleDateString("fr-FR")}
+            />
+          </div>
+        )}
+      </Modal>
+
+      {/* Édition */}
+      <Modal
+        open={editionOuverte !== null}
+        onClose={() => setEditionOuverte(null)}
+        title={`Modifier — ${editionOuverte?.nom ?? ""}`}
+      >
+        <form onSubmit={enregistrerEdition}>
+          <FormField label="Véhicule">
+            <input
+              className={inputClass}
+              value={champsEdition.vehicule}
+              onChange={(e) => setChampsEdition({ ...champsEdition, vehicule: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Zones couvertes (séparées par des virgules)">
+            <input
+              className={inputClass}
+              value={champsEdition.zonesCouvertes}
+              onChange={(e) => setChampsEdition({ ...champsEdition, zonesCouvertes: e.target.value })}
+              required
+            />
+          </FormField>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Pays">
+              <input
+                className={inputClass}
+                value={champsEdition.pays}
+                onChange={(e) => setChampsEdition({ ...champsEdition, pays: e.target.value })}
+                required
+              />
+            </FormField>
+            <FormField label="Ville">
+              <input
+                className={inputClass}
+                value={champsEdition.ville}
+                onChange={(e) => setChampsEdition({ ...champsEdition, ville: e.target.value })}
+                required
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Commune">
+              <input
+                className={inputClass}
+                value={champsEdition.commune}
+                onChange={(e) => setChampsEdition({ ...champsEdition, commune: e.target.value })}
+              />
+            </FormField>
+            <FormField label="Quartier">
+              <input
+                className={inputClass}
+                value={champsEdition.quartier}
+                onChange={(e) => setChampsEdition({ ...champsEdition, quartier: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Position (avec carte)">
+            <AddressPicker
+              valeur={adresseEdition}
+              onChange={(a) => {
+                setAdresseEdition(a.adresse);
+                setChampsEdition({
+                  ...champsEdition,
+                  latitude: a.latitude ? String(a.latitude) : "",
+                  longitude: a.longitude ? String(a.longitude) : "",
+                });
+              }}
+            />
+          </FormField>
+          <button
+            type="submit"
+            disabled={editionEnCours}
+            className="mt-2 w-full rounded-md bg-steel-500 py-2.5 text-sm font-medium text-white hover:bg-steel-600 disabled:opacity-60"
+          >
+            {editionEnCours ? "Enregistrement..." : "Enregistrer les modifications"}
           </button>
         </form>
       </Modal>
