@@ -12,6 +12,7 @@ import { Boutiques } from "./pages/Boutiques";
 import { Livreurs } from "./pages/Livreurs";
 import { Ramasseurs } from "./pages/Ramasseurs";
 import { Societes } from "./pages/Societes";
+import { Marques } from "./pages/Marques";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="livreurs" element={<Livreurs />} />
         <Route path="ramasseurs" element={<Ramasseurs />} />
         <Route path="societes" element={<Societes />} />
+        <Route path="marques" element={<Marques />} />
       </Route>
     </Routes>
   );

@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: "/livreurs", label: "Livreurs", icon: "▲" },
   { to: "/ramasseurs", label: "Ramasseurs", icon: "●" },
   { to: "/societes", label: "Sociétés", icon: "◫" },
+  { to: "/marques", label: "Marques de gaz", icon: "▣" },
 ];
 
 function ContenuMenu({
