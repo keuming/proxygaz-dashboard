@@ -21,6 +21,28 @@ interface Livreur {
   statutValidation: string;
   nombreLivraisons: number;
   createdAt: string;
+  nomSociete: string | null;
+}
+
+// Regroupe une liste rattachable à une société (nomSociete nul = indépendant) par société,
+// triées par ordre alphabétique, avec les indépendants toujours en dernier.
+function grouperParSociete<T extends { nomSociete: string | null }>(items: T[]) {
+  const groupes = new Map<string, T[]>();
+  for (const item of items) {
+    const cle = item.nomSociete ?? "__independants__";
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle)!.push(item);
+  }
+  const entrees = Array.from(groupes.entries());
+  entrees.sort((a, b) => {
+    if (a[0] === "__independants__") return 1;
+    if (b[0] === "__independants__") return -1;
+    return a[0].localeCompare(b[0]);
+  });
+  return entrees.map(([cle, items]) => ({
+    label: cle === "__independants__" ? "Indépendants" : cle,
+    items,
+  }));
 }
 
 const CHAMPS_INITIAUX = {
@@ -35,6 +57,7 @@ const CHAMPS_INITIAUX = {
   longitude: "",
   vehicule: "",
   zonesCouvertes: "",
+  societeLivraisonId: "",
 };
 
 const CHAMPS_EDITION_INITIAUX = {
@@ -66,6 +89,7 @@ function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
 
 export function Livreurs() {
   const [livreurs, setLivreurs] = useState<Livreur[]>([]);
+  const [societes, setSocietes] = useState<{ id: string; nomSociete: string }[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [actionEnCours, setActionEnCours] = useState<string | null>(null);
@@ -90,6 +114,9 @@ export function Livreurs() {
 
   useEffect(() => {
     charger();
+    trpcQuery<{ id: string; nomSociete: string; statutValidation: string }[]>("admin.listSocietesLivraison")
+      .then((rows) => setSocietes(rows.filter((s) => s.statutValidation === "valide")))
+      .catch(() => {});
   }, [charger]);
 
   async function changerStatut(id: string, statut: string) {
@@ -121,6 +148,7 @@ export function Livreurs() {
         longitude: champs.longitude ? Number(champs.longitude) : undefined,
         vehicule: champs.vehicule || undefined,
         zonesCouvertes: champs.zonesCouvertes.split(",").map((z) => z.trim()).filter(Boolean),
+        societeLivraisonId: champs.societeLivraisonId || undefined,
       });
       setModalOuvert(false);
       setChamps(CHAMPS_INITIAUX);
@@ -211,52 +239,59 @@ export function Livreurs() {
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
-              <tbody>
-                {livreurs.map((l) => (
-                  <tr key={l.id} className="border-b border-ink/5 last:border-0">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{l.nom}</div>
-                      <div className="font-data text-xs text-ink/50">{l.telephone}</div>
-                    </td>
-                    <td className="px-4 py-3 text-ink/70">{l.vehicule ?? "—"}</td>
-                    <td className="max-w-xs truncate px-4 py-3 text-ink/70">
-                      {l.zonesCouvertes.join(", ")}
-                    </td>
-                    <td className="px-4 py-3 font-data">{l.nombreLivraisons}</td>
-                    <td className="px-4 py-3">
-                      <StatusGauge statut={l.statutValidation} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setDetailsOuverts(l)}
-                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
-                        >
-                          Détails
-                        </button>
-                        <button
-                          onClick={() => ouvrirEdition(l)}
-                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
-                        >
-                          Modifier
-                        </button>
-                        <select
-                          value={l.statutValidation}
-                          disabled={actionEnCours === l.id}
-                          onChange={(e) => changerStatut(l.id, e.target.value)}
-                          className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
-                        >
-                          {STATUTS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+              {grouperParSociete(livreurs).map((groupe) => (
+                <tbody key={groupe.label}>
+                  <tr className="bg-ink/[0.03]">
+                    <td colSpan={6} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
+                      {groupe.label} · {groupe.items.length} livreur{groupe.items.length !== 1 ? "s" : ""}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  {groupe.items.map((l) => (
+                    <tr key={l.id} className="border-b border-ink/5 last:border-0">
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{l.nom}</div>
+                        <div className="font-data text-xs text-ink/50">{l.telephone}</div>
+                      </td>
+                      <td className="px-4 py-3 text-ink/70">{l.vehicule ?? "—"}</td>
+                      <td className="max-w-xs truncate px-4 py-3 text-ink/70">
+                        {l.zonesCouvertes.join(", ")}
+                      </td>
+                      <td className="px-4 py-3 font-data">{l.nombreLivraisons}</td>
+                      <td className="px-4 py-3">
+                        <StatusGauge statut={l.statutValidation} />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setDetailsOuverts(l)}
+                            className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                          >
+                            Détails
+                          </button>
+                          <button
+                            onClick={() => ouvrirEdition(l)}
+                            className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                          >
+                            Modifier
+                          </button>
+                          <select
+                            value={l.statutValidation}
+                            disabled={actionEnCours === l.id}
+                            onChange={(e) => changerStatut(l.id, e.target.value)}
+                            className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
+                          >
+                            {STATUTS.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
             </table>
           </div>
         )}
@@ -359,6 +394,20 @@ export function Livreurs() {
               onChange={(e) => setChamps({ ...champs, zonesCouvertes: e.target.value })}
               required
             />
+          </FormField>
+          <FormField label="Société de livraison (optionnel)">
+            <select
+              className={inputClass}
+              value={champs.societeLivraisonId}
+              onChange={(e) => setChamps({ ...champs, societeLivraisonId: e.target.value })}
+            >
+              <option value="">— Aucune (livreur indépendant) —</option>
+              {societes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nomSociete}
+                </option>
+              ))}
+            </select>
           </FormField>
 
           <button

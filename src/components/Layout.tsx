@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: "/boutiques", label: "Boutiques", icon: "▭" },
   { to: "/livreurs", label: "Livreurs", icon: "▲" },
   { to: "/ramasseurs", label: "Ramasseurs", icon: "●" },
+  { to: "/societes", label: "Sociétés", icon: "◫" },
 ];
 
 function ContenuMenu({

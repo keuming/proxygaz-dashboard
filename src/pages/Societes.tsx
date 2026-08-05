@@ -5,43 +5,22 @@ import { StatusGauge } from "../components/StatusGauge";
 import { Modal, FormField, inputClass } from "../components/Modal";
 import { AddressPicker } from "../components/AddressPicker";
 
-interface Boutique {
+interface Societe {
   id: string;
-  nomBoutique: string;
+  nomSociete: string;
   pays: string;
-  ville: string;
+  ville: string | null;
   commune: string | null;
   quartier: string | null;
-  adresse: string | null;
   latitude: number | null;
   longitude: number | null;
-  rayonLivraisonKm: number | null;
   statutValidation: string;
+  credits: number;
   gerantNom: string;
   gerantTelephone: string;
+  nombreLivreurs: number;
+  nombreBoutiques: number;
   createdAt: string;
-  nomSociete: string | null;
-}
-
-// Regroupe une liste rattachable à une société (nomSociete nul = indépendant) par société,
-// triées par ordre alphabétique, avec les indépendants toujours en dernier.
-function grouperParSociete<T extends { nomSociete: string | null }>(items: T[]) {
-  const groupes = new Map<string, T[]>();
-  for (const item of items) {
-    const cle = item.nomSociete ?? "__independants__";
-    if (!groupes.has(cle)) groupes.set(cle, []);
-    groupes.get(cle)!.push(item);
-  }
-  const entrees = Array.from(groupes.entries());
-  entrees.sort((a, b) => {
-    if (a[0] === "__independants__") return 1;
-    if (b[0] === "__independants__") return -1;
-    return a[0].localeCompare(b[0]);
-  });
-  return entrees.map(([cle, items]) => ({
-    label: cle === "__independants__" ? "Indépendantes" : cle,
-    items,
-  }));
 }
 
 function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
@@ -57,27 +36,23 @@ const CHAMPS_INITIAUX = {
   nom: "",
   telephone: "",
   codePin: "",
-  nomBoutique: "",
+  nomSociete: "",
   pays: "Côte d'Ivoire",
   ville: "Abidjan",
   commune: "",
   quartier: "",
-  adresse: "",
   latitude: "",
   longitude: "",
-  societeLivraisonId: "",
 };
 
 const CHAMPS_EDITION_INITIAUX = {
-  nomBoutique: "",
+  nomSociete: "",
   pays: "",
   ville: "",
   commune: "",
   quartier: "",
-  adresse: "",
   latitude: "",
   longitude: "",
-  rayonLivraisonKm: "",
 };
 
 const STATUTS: { value: string; label: string }[] = [
@@ -87,40 +62,38 @@ const STATUTS: { value: string; label: string }[] = [
   { value: "suspendu", label: "Suspendue (désactivée)" },
 ];
 
-export function Boutiques() {
-  const [boutiques, setBoutiques] = useState<Boutique[]>([]);
-  const [societes, setSocietes] = useState<{ id: string; nomSociete: string }[]>([]);
+export function Societes() {
+  const [societes, setSocietes] = useState<Societe[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [actionEnCours, setActionEnCours] = useState<string | null>(null);
   const [modalOuvert, setModalOuvert] = useState(false);
   const [champs, setChamps] = useState(CHAMPS_INITIAUX);
+  const [adresseAffichage, setAdresseAffichage] = useState("");
   const [creationEnCours, setCreationEnCours] = useState(false);
 
-  const [editionOuverte, setEditionOuverte] = useState<Boutique | null>(null);
-  const [detailsOuverts, setDetailsOuverts] = useState<Boutique | null>(null);
+  const [detailsOuverts, setDetailsOuverts] = useState<Societe | null>(null);
+  const [editionOuverte, setEditionOuverte] = useState<Societe | null>(null);
   const [champsEdition, setChampsEdition] = useState(CHAMPS_EDITION_INITIAUX);
+  const [adresseEdition, setAdresseEdition] = useState("");
   const [editionEnCours, setEditionEnCours] = useState(false);
 
   const charger = useCallback(() => {
     setChargement(true);
-    trpcQuery<Boutique[]>("admin.listBoutiques")
-      .then(setBoutiques)
+    trpcQuery<Societe[]>("admin.listSocietesLivraison")
+      .then(setSocietes)
       .catch((e) => setErreur(e.message))
       .finally(() => setChargement(false));
   }, []);
 
   useEffect(() => {
     charger();
-    trpcQuery<{ id: string; nomSociete: string; statutValidation: string }[]>("admin.listSocietesLivraison")
-      .then((rows) => setSocietes(rows.filter((s) => s.statutValidation === "valide")))
-      .catch(() => {});
   }, [charger]);
 
   async function changerStatut(id: string, statut: string) {
     setActionEnCours(id);
     try {
-      await trpcMutation("admin.changerStatutBoutique", { boutiqueId: id, statut });
+      await trpcMutation("admin.changerStatutSocieteLivraison", { societeId: id, statut });
       charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur");
@@ -129,22 +102,26 @@ export function Boutiques() {
     }
   }
 
-  async function creerBoutique(e: FormEvent) {
+  async function creerSociete(e: FormEvent) {
     e.preventDefault();
     setCreationEnCours(true);
     setErreur(null);
     try {
-      await trpcMutation("admin.creerBoutique", {
-        ...champs,
+      await trpcMutation("admin.creerSocieteLivraison", {
+        nom: champs.nom,
+        telephone: champs.telephone,
+        codePin: champs.codePin,
+        nomSociete: champs.nomSociete,
+        pays: champs.pays,
+        ville: champs.ville,
         commune: champs.commune || undefined,
         quartier: champs.quartier || undefined,
-        adresse: champs.adresse || undefined,
         latitude: champs.latitude ? Number(champs.latitude) : undefined,
         longitude: champs.longitude ? Number(champs.longitude) : undefined,
-        societeLivraisonId: champs.societeLivraisonId || undefined,
       });
       setModalOuvert(false);
       setChamps(CHAMPS_INITIAUX);
+      setAdresseAffichage("");
       charger();
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur lors de la création");
@@ -153,19 +130,18 @@ export function Boutiques() {
     }
   }
 
-  function ouvrirEdition(b: Boutique) {
+  function ouvrirEdition(s: Societe) {
     setChampsEdition({
-      nomBoutique: b.nomBoutique,
-      pays: b.pays,
-      ville: b.ville,
-      commune: b.commune ?? "",
-      quartier: b.quartier ?? "",
-      adresse: b.adresse ?? "",
-      latitude: b.latitude != null ? String(b.latitude) : "",
-      longitude: b.longitude != null ? String(b.longitude) : "",
-      rayonLivraisonKm: b.rayonLivraisonKm != null ? String(b.rayonLivraisonKm) : "",
+      nomSociete: s.nomSociete,
+      pays: s.pays,
+      ville: s.ville ?? "",
+      commune: s.commune ?? "",
+      quartier: s.quartier ?? "",
+      latitude: s.latitude != null ? String(s.latitude) : "",
+      longitude: s.longitude != null ? String(s.longitude) : "",
     });
-    setEditionOuverte(b);
+    setAdresseEdition(s.quartier ?? s.ville ?? "");
+    setEditionOuverte(s);
   }
 
   async function enregistrerEdition(e: FormEvent) {
@@ -174,19 +150,15 @@ export function Boutiques() {
     setEditionEnCours(true);
     setErreur(null);
     try {
-      await trpcMutation("admin.modifierBoutique", {
-        boutiqueId: editionOuverte.id,
-        nomBoutique: champsEdition.nomBoutique,
+      await trpcMutation("admin.modifierSocieteLivraison", {
+        societeId: editionOuverte.id,
+        nomSociete: champsEdition.nomSociete,
         pays: champsEdition.pays,
         ville: champsEdition.ville,
         commune: champsEdition.commune || undefined,
         quartier: champsEdition.quartier || undefined,
-        adresse: champsEdition.adresse || undefined,
         latitude: champsEdition.latitude ? Number(champsEdition.latitude) : undefined,
         longitude: champsEdition.longitude ? Number(champsEdition.longitude) : undefined,
-        rayonLivraisonKm: champsEdition.rayonLivraisonKm
-          ? Number(champsEdition.rayonLivraisonKm)
-          : undefined,
       });
       setEditionOuverte(null);
       charger();
@@ -200,12 +172,12 @@ export function Boutiques() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <PageHeader title="Boutiques" subtitle="Dépôts de gaz partenaires" />
+        <PageHeader title="Sociétés de livraison" subtitle="Entreprises regroupant plusieurs livreurs et boutiques" />
         <button
           onClick={() => setModalOuvert(true)}
           className="rounded-md bg-steel-500 px-4 py-2 text-sm font-medium text-white hover:bg-steel-600"
         >
-          + Ajouter une boutique
+          + Ajouter une société
         </button>
       </div>
 
@@ -216,65 +188,67 @@ export function Boutiques() {
       <Card>
         {chargement ? (
           <div className="p-6 text-sm text-ink/50">Chargement...</div>
-        ) : boutiques.length === 0 ? (
-          <div className="p-6 text-sm text-ink/50">Aucune boutique enregistrée.</div>
+        ) : societes.length === 0 ? (
+          <div className="p-6 text-sm text-ink/50">Aucune société enregistrée.</div>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
-                <th className="px-4 py-3">Boutique</th>
-                <th className="px-4 py-3">Localisation</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            {grouperParSociete(boutiques).map((groupe) => (
-              <tbody key={groupe.label}>
-                <tr className="bg-ink/[0.03]">
-                  <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
-                    {groupe.label} · {groupe.items.length} boutique{groupe.items.length !== 1 ? "s" : ""}
-                  </td>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink/10 text-left text-xs uppercase tracking-wide text-ink/40">
+                  <th className="px-4 py-3">Société</th>
+                  <th className="px-4 py-3">Localisation</th>
+                  <th className="px-4 py-3">Livreurs</th>
+                  <th className="px-4 py-3">Boutiques</th>
+                  <th className="px-4 py-3">Pot commun</th>
+                  <th className="px-4 py-3">Statut</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
-                {groupe.items.map((b) => (
-                  <tr key={b.id} className="border-b border-ink/5 last:border-0">
+              </thead>
+              <tbody>
+                {societes.map((s) => (
+                  <tr key={s.id} className="border-b border-ink/5 last:border-0">
                     <td className="px-4 py-3">
-                      <div className="font-medium">{b.nomBoutique}</div>
+                      <div className="font-medium">{s.nomSociete}</div>
                       <div className="font-data text-xs text-ink/50">
-                        {b.gerantNom} · {b.gerantTelephone}
+                        {s.gerantNom} · {s.gerantTelephone}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-ink/70">
-                      {b.quartier ? `${b.quartier}, ` : ""}
-                      {b.commune ? `${b.commune}, ` : ""}
-                      {b.ville}
+                      {s.quartier ? `${s.quartier}, ` : ""}
+                      {s.commune ? `${s.commune}, ` : ""}
+                      {s.ville ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 font-data">{s.nombreLivreurs}</td>
+                    <td className="px-4 py-3 font-data">{s.nombreBoutiques}</td>
+                    <td className="px-4 py-3 font-data">
+                      {s.credits} crédit{s.credits !== 1 ? "s" : ""}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusGauge statut={b.statutValidation} />
+                      <StatusGauge statut={s.statutValidation} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => setDetailsOuverts(b)}
+                          onClick={() => setDetailsOuverts(s)}
                           className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
                         >
                           Détails
                         </button>
                         <button
-                          onClick={() => ouvrirEdition(b)}
+                          onClick={() => ouvrirEdition(s)}
                           className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
                         >
                           Modifier
                         </button>
                         <select
-                          value={b.statutValidation}
-                          disabled={actionEnCours === b.id}
-                          onChange={(e) => changerStatut(b.id, e.target.value)}
+                          value={s.statutValidation}
+                          disabled={actionEnCours === s.id}
+                          onChange={(e) => changerStatut(s.id, e.target.value)}
                           className="rounded-md border border-ink/15 px-2 py-1.5 text-xs disabled:opacity-60"
                         >
-                          {STATUTS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
+                          {STATUTS.map((st) => (
+                            <option key={st.value} value={st.value}>
+                              {st.label}
                             </option>
                           ))}
                         </select>
@@ -283,14 +257,14 @@ export function Boutiques() {
                   </tr>
                 ))}
               </tbody>
-            ))}
-          </table>
+            </table>
           </div>
         )}
       </Card>
 
-      <Modal open={modalOuvert} onClose={() => setModalOuvert(false)} title="Nouvelle boutique">
-        <form onSubmit={creerBoutique}>
+      {/* Création */}
+      <Modal open={modalOuvert} onClose={() => setModalOuvert(false)} title="Nouvelle société de livraison">
+        <form onSubmit={creerSociete}>
           <FormField label="Nom du gérant">
             <input
               className={inputClass}
@@ -321,11 +295,11 @@ export function Boutiques() {
               required
             />
           </FormField>
-          <FormField label="Nom de la boutique">
+          <FormField label="Nom de la société">
             <input
               className={inputClass}
-              value={champs.nomBoutique}
-              onChange={(e) => setChamps({ ...champs, nomBoutique: e.target.value })}
+              value={champs.nomSociete}
+              onChange={(e) => setChamps({ ...champs, nomSociete: e.target.value })}
               required
             />
           </FormField>
@@ -364,39 +338,26 @@ export function Boutiques() {
               />
             </FormField>
           </div>
-          <FormField label="Adresse précise (avec carte)">
+          <FormField label="Position (avec carte)">
             <AddressPicker
-              valeur={champs.adresse}
-              onChange={(a) =>
+              valeur={adresseAffichage}
+              onChange={(a) => {
+                setAdresseAffichage(a.adresse);
                 setChamps({
                   ...champs,
-                  adresse: a.adresse,
                   latitude: a.latitude ? String(a.latitude) : "",
                   longitude: a.longitude ? String(a.longitude) : "",
-                })
-              }
+                });
+              }}
             />
           </FormField>
-          <FormField label="Société de livraison (optionnel)">
-            <select
-              className={inputClass}
-              value={champs.societeLivraisonId}
-              onChange={(e) => setChamps({ ...champs, societeLivraisonId: e.target.value })}
-            >
-              <option value="">— Aucune (boutique indépendante) —</option>
-              {societes.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nomSociete}
-                </option>
-              ))}
-            </select>
-          </FormField>
+
           <button
             type="submit"
             disabled={creationEnCours}
             className="mt-2 w-full rounded-md bg-steel-500 py-2.5 text-sm font-medium text-white hover:bg-steel-600 disabled:opacity-60"
           >
-            {creationEnCours ? "Création..." : "Créer la boutique (validée d'office)"}
+            {creationEnCours ? "Création..." : "Créer la société (validée d'office)"}
           </button>
         </form>
       </Modal>
@@ -405,29 +366,20 @@ export function Boutiques() {
       <Modal
         open={detailsOuverts !== null}
         onClose={() => setDetailsOuverts(null)}
-        title={detailsOuverts?.nomBoutique ?? "Détails"}
+        title={detailsOuverts?.nomSociete || "Détails"}
       >
         {detailsOuverts && (
           <div>
+            <LigneDetail label="Nom de la société" valeur={detailsOuverts.nomSociete} />
             <LigneDetail label="Gérant" valeur={detailsOuverts.gerantNom} />
             <LigneDetail label="Téléphone" valeur={detailsOuverts.gerantTelephone} />
             <LigneDetail label="Pays" valeur={detailsOuverts.pays} />
-            <LigneDetail label="Ville" valeur={detailsOuverts.ville} />
+            <LigneDetail label="Ville" valeur={detailsOuverts.ville ?? ""} />
             <LigneDetail label="Commune" valeur={detailsOuverts.commune ?? ""} />
             <LigneDetail label="Quartier" valeur={detailsOuverts.quartier ?? ""} />
-            <LigneDetail label="Adresse" valeur={detailsOuverts.adresse ?? ""} />
-            <LigneDetail
-              label="Position GPS"
-              valeur={
-                detailsOuverts.latitude != null
-                  ? `${detailsOuverts.latitude}, ${detailsOuverts.longitude}`
-                  : ""
-              }
-            />
-            <LigneDetail
-              label="Rayon de livraison"
-              valeur={detailsOuverts.rayonLivraisonKm != null ? `${detailsOuverts.rayonLivraisonKm} km` : ""}
-            />
+            <LigneDetail label="Livreurs rattachés" valeur={String(detailsOuverts.nombreLivreurs)} />
+            <LigneDetail label="Boutiques rattachées" valeur={String(detailsOuverts.nombreBoutiques)} />
+            <LigneDetail label="Pot de crédit commun" valeur={`${detailsOuverts.credits} crédit(s)`} />
             <LigneDetail
               label="Inscrite le"
               valeur={new Date(detailsOuverts.createdAt).toLocaleDateString("fr-FR")}
@@ -436,17 +388,18 @@ export function Boutiques() {
         )}
       </Modal>
 
+      {/* Édition */}
       <Modal
         open={editionOuverte !== null}
         onClose={() => setEditionOuverte(null)}
-        title={`Modifier — ${editionOuverte?.nomBoutique ?? ""}`}
+        title={`Modifier — ${editionOuverte?.nomSociete ?? ""}`}
       >
         <form onSubmit={enregistrerEdition}>
-          <FormField label="Nom de la boutique">
+          <FormField label="Nom de la société">
             <input
               className={inputClass}
-              value={champsEdition.nomBoutique}
-              onChange={(e) => setChampsEdition({ ...champsEdition, nomBoutique: e.target.value })}
+              value={champsEdition.nomSociete}
+              onChange={(e) => setChampsEdition({ ...champsEdition, nomSociete: e.target.value })}
               required
             />
           </FormField>
@@ -484,28 +437,17 @@ export function Boutiques() {
               />
             </FormField>
           </div>
-          <FormField label="Adresse précise (avec carte)">
+          <FormField label="Position (avec carte)">
             <AddressPicker
-              valeur={champsEdition.adresse}
-              onChange={(a) =>
+              valeur={adresseEdition}
+              onChange={(a) => {
+                setAdresseEdition(a.adresse);
                 setChampsEdition({
                   ...champsEdition,
-                  adresse: a.adresse,
                   latitude: a.latitude ? String(a.latitude) : "",
                   longitude: a.longitude ? String(a.longitude) : "",
-                })
-              }
-            />
-          </FormField>
-          <FormField label="Rayon de livraison (km)">
-            <input
-              type="number"
-              step="any"
-              className={inputClass}
-              value={champsEdition.rayonLivraisonKm}
-              onChange={(e) =>
-                setChampsEdition({ ...champsEdition, rayonLivraisonKm: e.target.value })
-              }
+                });
+              }}
             />
           </FormField>
           <button
