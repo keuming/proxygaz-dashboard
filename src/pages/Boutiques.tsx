@@ -20,6 +20,7 @@ interface Boutique {
   gerantNom: string;
   gerantTelephone: string;
   createdAt: string;
+  societeLivraisonId: string | null;
   nomSociete: string | null;
 }
 
@@ -78,6 +79,7 @@ const CHAMPS_EDITION_INITIAUX = {
   latitude: "",
   longitude: "",
   rayonLivraisonKm: "",
+  societeLivraisonId: "",
 };
 
 const STATUTS: { value: string; label: string }[] = [
@@ -164,6 +166,7 @@ export function Boutiques() {
       latitude: b.latitude != null ? String(b.latitude) : "",
       longitude: b.longitude != null ? String(b.longitude) : "",
       rayonLivraisonKm: b.rayonLivraisonKm != null ? String(b.rayonLivraisonKm) : "",
+      societeLivraisonId: b.societeLivraisonId ?? "",
     });
     setEditionOuverte(b);
   }
@@ -187,6 +190,8 @@ export function Boutiques() {
         rayonLivraisonKm: champsEdition.rayonLivraisonKm
           ? Number(champsEdition.rayonLivraisonKm)
           : undefined,
+        // "" = détacher explicitement (→ null), une société sélectionnée = rattacher
+        societeLivraisonId: champsEdition.societeLivraisonId || null,
       });
       setEditionOuverte(null);
       charger();
@@ -411,6 +416,7 @@ export function Boutiques() {
           <div>
             <LigneDetail label="Gérant" valeur={detailsOuverts.gerantNom} />
             <LigneDetail label="Téléphone" valeur={detailsOuverts.gerantTelephone} />
+            <LigneDetail label="Société de livraison" valeur={detailsOuverts.nomSociete ?? "Indépendante"} />
             <LigneDetail label="Pays" valeur={detailsOuverts.pays} />
             <LigneDetail label="Ville" valeur={detailsOuverts.ville} />
             <LigneDetail label="Commune" valeur={detailsOuverts.commune ?? ""} />
@@ -507,6 +513,20 @@ export function Boutiques() {
                 setChampsEdition({ ...champsEdition, rayonLivraisonKm: e.target.value })
               }
             />
+          </FormField>
+          <FormField label="Société de livraison (optionnel)">
+            <select
+              className={inputClass}
+              value={champsEdition.societeLivraisonId}
+              onChange={(e) => setChampsEdition({ ...champsEdition, societeLivraisonId: e.target.value })}
+            >
+              <option value="">— Aucune (boutique indépendante) —</option>
+              {societes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nomSociete}
+                </option>
+              ))}
+            </select>
           </FormField>
           <button
             type="submit"
