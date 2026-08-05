@@ -54,6 +54,14 @@ function LigneDetail({ label, valeur }: { label: string; valeur: string }) {
   );
 }
 
+interface StockLigne {
+  marqueGazId: string;
+  marqueNom: string;
+  marqueTaille: string;
+  quantiteDisponible: number;
+  seuilAlerte: number;
+}
+
 const CHAMPS_INITIAUX = {
   nom: "",
   telephone: "",
@@ -103,6 +111,11 @@ export function Boutiques() {
   const [detailsOuverts, setDetailsOuverts] = useState<Boutique | null>(null);
   const [champsEdition, setChampsEdition] = useState(CHAMPS_EDITION_INITIAUX);
   const [editionEnCours, setEditionEnCours] = useState(false);
+
+  const [stockOuvert, setStockOuvert] = useState<Boutique | null>(null);
+  const [stockItems, setStockItems] = useState<StockLigne[]>([]);
+  const [stockChargement, setStockChargement] = useState(false);
+  const [stockErreur, setStockErreur] = useState<string | null>(null);
 
   const charger = useCallback(() => {
     setChargement(true);
@@ -202,6 +215,37 @@ export function Boutiques() {
     }
   }
 
+  function ouvrirStock(b: Boutique) {
+    setStockOuvert(b);
+    setStockChargement(true);
+    setStockErreur(null);
+    trpcQuery<StockLigne[]>("admin.stockDUneBoutique", { boutiqueId: b.id })
+      .then(setStockItems)
+      .catch((e) => setStockErreur(e instanceof Error ? e.message : "Erreur"))
+      .finally(() => setStockChargement(false));
+  }
+
+  async function majLigneStock(marqueGazId: string, quantiteDisponible: number, seuilAlerte?: number) {
+    if (!stockOuvert) return;
+    try {
+      await trpcMutation("admin.majStock", {
+        boutiqueId: stockOuvert.id,
+        marqueGazId,
+        quantiteDisponible,
+        seuilAlerte,
+      });
+      setStockItems((items) =>
+        items.map((it) =>
+          it.marqueGazId === marqueGazId
+            ? { ...it, quantiteDisponible, seuilAlerte: seuilAlerte ?? it.seuilAlerte }
+            : it
+        )
+      );
+    } catch (e) {
+      setStockErreur(e instanceof Error ? e.message : "Erreur lors de la mise à jour du stock");
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -259,6 +303,12 @@ export function Boutiques() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => ouvrirStock(b)}
+                          className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
+                        >
+                          Stock
+                        </button>
                         <button
                           onClick={() => setDetailsOuverts(b)}
                           className="rounded-md border border-ink/15 px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-ink/5"
@@ -404,6 +454,64 @@ export function Boutiques() {
             {creationEnCours ? "Création..." : "Créer la boutique (validée d'office)"}
           </button>
         </form>
+      </Modal>
+
+      {/* Stock */}
+      <Modal
+        open={stockOuvert !== null}
+        onClose={() => setStockOuvert(null)}
+        title={`Stock — ${stockOuvert?.nomBoutique ?? ""}`}
+      >
+        {stockErreur && (
+          <div className="mb-4 rounded-md bg-valve-400/10 px-4 py-3 text-sm text-valve-600">{stockErreur}</div>
+        )}
+        {stockChargement ? (
+          <div className="py-6 text-sm text-ink/50">Chargement...</div>
+        ) : (
+          <div className="space-y-3">
+            {stockItems.map((s) => (
+              <div key={s.marqueGazId} className="flex items-center justify-between border-b border-ink/5 py-2">
+                <div>
+                  <div className="text-sm font-medium text-ink">
+                    {s.marqueNom} — {s.marqueTaille}
+                  </div>
+                  <div className="text-xs text-ink/40">Seuil d'alerte : {s.seuilAlerte}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <label className="block text-[10px] uppercase text-ink/40">Quantité</label>
+                    <input
+                      type="number"
+                      min={0}
+                      defaultValue={s.quantiteDisponible}
+                      onBlur={(e) => majLigneStock(s.marqueGazId, Number(e.target.value), s.seuilAlerte)}
+                      className="w-20 rounded-md border border-ink/15 px-2 py-1.5 text-right text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase text-ink/40">Seuil</label>
+                    <input
+                      type="number"
+                      min={0}
+                      defaultValue={s.seuilAlerte}
+                      onBlur={(e) =>
+                        majLigneStock(s.marqueGazId, s.quantiteDisponible, Number(e.target.value))
+                      }
+                      className="w-16 rounded-md border border-ink/15 px-2 py-1.5 text-right text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            {stockItems.length === 0 && (
+              <p className="text-sm text-ink/40">Aucune marque active dans le référentiel.</p>
+            )}
+            <p className="pt-2 text-xs text-ink/40">
+              Ces quantités s'ajoutent à celles des autres boutiques pour former le total
+              affiché sur le site vitrine, par marque.
+            </p>
+          </div>
+        )}
       </Modal>
 
       {/* Détails (lecture seule) */}
