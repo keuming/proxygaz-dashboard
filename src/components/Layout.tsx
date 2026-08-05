@@ -84,7 +84,7 @@ export function Layout() {
   const [tiroirOuvert, setTiroirOuvert] = useState(false);
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-surface">
+    <div className="flex h-dvh overflow-hidden bg-surface">
       {/* Menu latéral statique — uniquement sur desktop, jamais monté sur mobile */}
       <aside className="hidden w-64 shrink-0 flex-col bg-panel text-white/90 sm:flex">
         <ContenuMenu onNaviguer={() => {}} />
